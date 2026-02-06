@@ -27,10 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Optional but recommended (if tests exist)
-      # - name: Run tests with coverage
-      #   run: npm test -- --coverage
-
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
@@ -38,3 +34,5 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=23suca16-sys_bankingsystem3-frontend
+            -Dsonar.organization=23suca16-sys
+            -Dsonar.sources=src
