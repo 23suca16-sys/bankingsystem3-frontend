@@ -27,6 +27,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # ✅ ADD THIS STEP (VERY IMPORTANT)
+      - name: Run tests with coverage
+        run: CI=true npm test
+
+      # ✅ Sonar scan (updated with coverage path)
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
@@ -36,3 +41,4 @@ jobs:
             -Dsonar.projectKey=23suca16-sys_bankingsystem3-frontend
             -Dsonar.organization=23suca16-sys
             -Dsonar.sources=src
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
