@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import "./App.css";
+import apiService from "./apiService";
 
 function App() {
   const [alert, setAlert] = useState("");
@@ -15,59 +15,66 @@ function App() {
       showAlert("Please fill all fields");
       return;
     }
-    try {
-      const res = await axios.post("http://localhost:8080/api/users", newUser);
-      setUsers([...users, res.data]);
-      setNewUser({ name: "", email: "", password: "", role: "USER" });
-      showAlert("User added successfully!");
-    } catch (err) {
-      showAlert("Error adding user");
-      console.error(err);
+    const { data, error, notice } = await apiService.createUser(newUser);
+
+    if (notice) showAlert(notice);
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    setUsers([...users, data]);
+    setNewUser({ name: "", email: "", password: "", role: "USER" });
+    showAlert("User added successfully!");
   };
 
   const deleteUser = async (id) => {
-    try {
-      await axios.delete(`http://localhost:8080/api/users/${id}`);
-      setUsers(users.filter((u) => u.id !== id));
-      showAlert("User deleted successfully!");
-    } catch (err) {
-      showAlert("Error deleting user");
-      console.error(err);
+    const { error, notice } = await apiService.deleteUser(id);
+
+    if (notice) showAlert(notice);
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    setUsers(users.filter((u) => u.id !== id));
+    showAlert("User deleted successfully!");
   };
 
   const updateUser = async (id) => {
-    try {
-      const updatedName = prompt("Enter new name:");
-      const updatedEmail = prompt("Enter new email:");
-      const updatedPassword = prompt("Enter new password:");
-      const updatedRole = prompt("Enter role (USER/ADMIN):");
-      const res = await axios.put(`http://localhost:8080/api/users/${id}`, {
-        name: updatedName,
-        email: updatedEmail,
-        password: updatedPassword,
-        role: updatedRole,
-      });
-      setUsers(users.map((u) => (u.id === id ? res.data : u)));
-      showAlert("User updated successfully!");
-    } catch (err) {
-      showAlert("Error updating user");
-      console.error(err);
+    const updatedName = prompt("Enter new name:");
+    const updatedEmail = prompt("Enter new email:");
+    const updatedPassword = prompt("Enter new password:");
+    const updatedRole = prompt("Enter role (USER/ADMIN):");
+
+    const { data, error, notice } = await apiService.updateUser(id, {
+      name: updatedName,
+      email: updatedEmail,
+      password: updatedPassword,
+      role: updatedRole,
+    });
+
+    if (notice) showAlert(notice);
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    setUsers(users.map((u) => (u.id === id ? data : u)));
+    showAlert("User updated successfully!");
   };
 
   useEffect(() => {
     const loadUsers = async () => {
       if (page !== "users") return;
-      try {
-        const res = await axios.get("http://localhost:8080/api/users");
-        setUsers(res.data);
-      } catch (err) {
-        showAlert("Error fetching users");
-        console.error(err);
-      }
+
+      const { data, error, notice } = await apiService.getUsers();
+      if (notice) showAlert(notice);
+      if (error) showAlert(error);
+
+      setUsers(Array.isArray(data) ? data : []);
     };
+
     loadUsers();
   }, [page]);
 
@@ -79,13 +86,12 @@ function App() {
   const fetchAccounts = async (userId) => {
     const id = Number(userId);
     if (!id) return showAlert("Enter valid User ID");
-    try {
-      const res = await axios.get(`http://localhost:8080/api/accounts/user/${id}`);
-      setAccounts(res.data);
-    } catch (err) {
-      showAlert("Error fetching accounts");
-      console.error(err);
-    }
+
+    const { data, error, notice } = await apiService.getAccountsByUser(id);
+    if (notice) showAlert(notice);
+    if (error) showAlert(error);
+
+    setAccounts(Array.isArray(data) ? data : []);
   };
 
   const addAccount = async () => {
@@ -94,15 +100,17 @@ function App() {
       showAlert("Enter valid User ID and Account details");
       return;
     }
-    try {
-      const res = await axios.post(`http://localhost:8080/api/accounts/user/${userId}`, newAccount);
-      setAccounts([...accounts, res.data]);
-      setNewAccount({ accountNumber: "", accountType: "SAVINGS", balance: 0 });
-      showAlert("Account created successfully!");
-    } catch (err) {
-      showAlert("Error creating account");
-      console.error(err);
+
+    const { data, error, notice } = await apiService.createAccountForUser(userId, newAccount);
+    if (notice) showAlert(notice);
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    setAccounts([...accounts, data]);
+    setNewAccount({ accountNumber: "", accountType: "SAVINGS", balance: 0 });
+    showAlert("Account created successfully!");
   };
 
   /** ------------------- TRANSACTION MODULE ------------------- **/
@@ -114,23 +122,23 @@ const fetchTransactions = async (accountId) => {
   const id = Number(accountId);
   if (!id) return showAlert("Enter valid Account ID");
 
-  try {
-    const res = await axios.get(`http://localhost:8080/api/accounts/${id}/transactions`);
-    setTransactions(res.data);
+  const { data, error, notice } = await apiService.getTransactionsByAccount(id);
+  if (notice) showAlert(notice);
+  if (error) showAlert(error);
 
-    // Calculate total balance from transaction history
-    const total = res.data.reduce((acc, t) => {
-      if (t.type.toLowerCase() === "deposit") return acc + t.amount;
-      if (t.type.toLowerCase() === "withdraw") return acc - t.amount;
-      return acc;
-    }, 0);
+  const safeTransactions = Array.isArray(data) ? data : [];
+  setTransactions(safeTransactions);
 
-    setTotalBalance(total);
+  const total = safeTransactions.reduce((acc, transaction) => {
+    const type = String(transaction?.type || "").toLowerCase();
+    const transactionAmount = Number(transaction?.amount || 0);
 
-  } catch (err) {
-    showAlert("Error fetching transactions");
-    console.error(err);
-  }
+    if (type === "deposit") return acc + transactionAmount;
+    if (type === "withdraw") return acc - transactionAmount;
+    return acc;
+  }, 0);
+
+  setTotalBalance(total);
 };
 
 
@@ -138,30 +146,34 @@ const fetchTransactions = async (accountId) => {
     const id = Number(transAccountId);
     const amt = Number(amount);
     if (!id || !amt) return showAlert("Enter valid Account ID and Amount");
-    try {
-      await axios.post(`http://localhost:8080/api/accounts/${id}/deposit?amount=${amt}`);
-      showAlert("Deposit successful!");
-      setAmount("");
-      fetchTransactions(id);
-    } catch (err) {
-      showAlert(err.response?.data?.message || "Error depositing money");
-      console.error(err);
+
+    const { error, notice } = await apiService.deposit(id, amt);
+    if (notice) showAlert(notice);
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    showAlert("Deposit successful!");
+    setAmount("");
+    fetchTransactions(id);
   };
 
   const withdraw = async () => {
     const id = Number(transAccountId);
     const amt = Number(amount);
     if (!id || !amt) return showAlert("Enter valid Account ID and Amount");
-    try {
-      await axios.post(`http://localhost:8080/api/accounts/${id}/withdraw?amount=${amt}`);
-      showAlert("Withdrawal successful!");
-      setAmount("");
-      fetchTransactions(id);
-    } catch (err) {
-      showAlert(err.response?.data?.message || "Error withdrawing money");
-      console.error(err);
+
+    const { error, notice } = await apiService.withdraw(id, amt);
+    if (notice) showAlert(notice);
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    showAlert("Withdrawal successful!");
+    setAmount("");
+    fetchTransactions(id);
   };
 
   /** ------------------- ALERT ------------------- **/
@@ -245,6 +257,7 @@ const fetchTransactions = async (accountId) => {
           </div>
           <h2 style={{ marginTop: "30px" }}>All Users</h2>
           <div className="hero-buttons" style={{ flexDirection: "column", gap: "10px" }}>
+            {users.length === 0 && <div>No data available</div>}
             {users.map((user) => (
               <div key={user.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "350px", margin: "5px auto", padding: "10px", background: "rgba(255,255,255,0.1)", borderRadius: "10px" }}>
                 <span>ID: {user.id} | {user.name} ({user.role})</span>
@@ -290,6 +303,7 @@ const fetchTransactions = async (accountId) => {
           </div>
 
           <div className="hero-buttons" style={{ flexDirection: "column", gap: "10px", marginTop: "20px" }}>
+            {accounts.length === 0 && <div>No data available</div>}
             {accounts.map((acc) => (
               <div key={acc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "400px", margin: "5px auto", padding: "10px", background: "rgba(255,255,255,0.1)", borderRadius: "10px" }}>
                 <span>User ID: {selectedUserId} | Acc: {acc.accountNumber} | Type: {acc.accountType} </span>
@@ -326,6 +340,7 @@ const fetchTransactions = async (accountId) => {
 
           <div className="hero-buttons" style={{ flexDirection: "column", gap: "10px", marginTop: "20px" }}>
             {/* Transactions list */}
+            {transactions.length === 0 && <div>No data available</div>}
             {transactions.map((t, index) => (
               <div key={index} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "400px", margin: "5px auto", padding: "10px", background: "rgba(255,255,255,0.1)", borderRadius: "10px" }}>
                 <span>{t.type}: {t.amount}</span>

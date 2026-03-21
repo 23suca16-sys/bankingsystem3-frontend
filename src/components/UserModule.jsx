@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import apiService from "../apiService";
 import "./UserModule.css"; // we will create this CSS file
 
 function UserModule() {
@@ -15,12 +15,11 @@ function UserModule() {
 
   // Fetch all users
   const fetchUsers = async () => {
-    try {
-      const res = await axios.get("http://localhost:8080/api/users");
-      setUsers(res.data);
-    } catch (err) {
-      showAlert("Failed to fetch users");
-    }
+    const { data, error, notice } = await apiService.getUsers();
+    if (notice) showAlert(notice);
+    if (error) showAlert(error);
+
+    setUsers(Array.isArray(data) ? data : []);
   };
 
   useEffect(() => {
@@ -34,14 +33,17 @@ function UserModule() {
 
   // Create user
   const handleCreate = async () => {
-    try {
-      await axios.post("http://localhost:8080/api/users", form);
-      showAlert("User Created Successfully!");
-      setForm({ name: "", email: "", password: "", role: "USER" });
-      fetchUsers();
-    } catch (err) {
-      showAlert("Failed to create user");
+    const { error, notice } = await apiService.createUser(form);
+    if (notice) showAlert(notice);
+
+    if (error) {
+      showAlert(error);
+      return;
     }
+
+    showAlert("User Created Successfully!");
+    setForm({ name: "", email: "", password: "", role: "USER" });
+    fetchUsers();
   };
 
   return (
@@ -66,6 +68,7 @@ function UserModule() {
       <div className="users-list">
         <h2>All Users</h2>
         <div className="users-grid">
+          {users.length === 0 && <p>No data available</p>}
           {users.map((user) => (
             <div key={user.id} className="user-card">
               <p><strong>Name:</strong> {user.name}</p>
