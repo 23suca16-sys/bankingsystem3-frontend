@@ -40,7 +40,6 @@ function App() {
   setUsers(users.filter((u) => u.id !== id));
   showAlert("User deleted successfully!");
 }; 
-
   setUsers(users.filter((u) => u.id !== id));
   showAlert("User deleted successfully!");
 };
