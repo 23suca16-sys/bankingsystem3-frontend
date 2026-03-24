@@ -29,6 +29,12 @@ function App() {
   };
 
 const deleteUser = async (id) => {
+  const deletePassword = prompt("Enter delete password:");
+  if (deletePassword !== "2005") {
+    showAlert("Invalid password. Delete canceled.");
+    return;
+  }
+
   const { error, notice } = await apiService.deleteUser(id);
 
   if (notice) showAlert(notice);
@@ -39,7 +45,7 @@ const deleteUser = async (id) => {
 
   setUsers(users.filter((u) => u.id !== id));
   showAlert("User deleted successfully!");
-}; 
+};
 
   const updateUser = async (id) => {
     const updatedName = prompt("Enter new name:");
